@@ -44,6 +44,7 @@ class Packet {
         commandArr[2] = length; //length
         commandArr[3] = command; //command
 
+        // заполняем массив команды значениями из data[], начиная с 4 индекса.
         if (data.length != 0) {
             int i = 4, d=0;
             while (d != data.length) {

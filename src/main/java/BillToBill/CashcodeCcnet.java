@@ -27,20 +27,23 @@ public class CashcodeCcnet extends Packet {
             здесь указаны значения для каждого номинала банкноты. Судя по документации,
             порядок от меньшей банкноты к большей зависит от прошивки. Если в купюроприемник
             вбита российская прошивка, то банкноты должны быть упорядочены так :
-            10 рублей -   4 (00100) 2 бит
-            50 рублей -   8 (01000) 3 бит
-            100 рублей - 16 (10000) 4 бит   и т.д.
+            10 рублей  -  1 (00001) 1 бит
+            50 рублей  -  2 (00010) 2 бит
+            100 рублей -  4 (00100) 3 бит   и т.д.
             ...
          */
-        int cash = 4+8+16+32+64+128;
-        sendEnableBillTypes(cash);
+        // вариант с подтверждением всех номиналов
+        // cash = 1+2+4+8+16+32 = 63 - переводим в hexodecimal, получаем 0x3F
+        // исключаем 100 RUB
+        // cash = 1+2+8+16+32 = 59 - переводим в hexodecimal, получаем 0x3B
+        sendEnableBillTypes(0x3B);
         startPollingLoop();
     }
 
 
     public boolean stop() throws SerialPortException {
         stopPolling();
-        boolean result = serialPort.isOpened() ? serialPort.closePort() : false;
+        boolean result = serialPort.isOpened() && serialPort.closePort();
         return result;
     }
 
@@ -51,20 +54,10 @@ public class CashcodeCcnet extends Packet {
             sendDescription();
             //TODO if (...) sendReturn();
 
-            //TODO    интуитивное решение :
-            //TODO  int[] temp = formPacket[0x31, new int[]{});
-            //TODO  if temp[5] =
-
-            // банкнота номиналом в 100 RUB , должна занимать 4 бит ячейки в своем
-            // диапазоне. Предполагаю, что тут необходимо выболнить отправку формы
-            // formPacket(0x31, new int[]{}), то есть выполнить команду GET STATUS,
-            // которая должна вернуть массив байтов, ГДЕ ОДИН ИЗ ИНДЕКСОВ как раз и
-            // содержит номинал в 100 RUB, этот же индекс находится в диапазоне Z1-Z3
-            // но я так и не понял, в каком порядке будет индексироваться выходной массив
-            // и с какими значениями......
         }
     }
 
+    // прерывание цикла
     public void stopPolling() {
         isLoop = false;
     }
@@ -106,7 +99,7 @@ public class CashcodeCcnet extends Packet {
 
     // демонстрация доступных видов купюр для оплаты
     public void sendEnableBillTypes(int value) throws SerialPortException, InterruptedException {
-        sendPacket(formPacket(0x34,new int[]{0,0,0xFC,0,0,0}));
+        sendPacket(formPacket(0x34,new int[]{0,0,value,0,0,0}));
     }
 
     // возврат купюры
