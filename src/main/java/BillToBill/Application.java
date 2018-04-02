@@ -1,11 +1,12 @@
 package BillToBill;
 
+import javax.swing.*;
+
 public class Application {
-    private static final String portNameLinux = "/dev/ttyS0"; // для LINUX
-    private static final String portNameWindows = "COM1"; // для WINDOWS
+    private static String portName = JOptionPane.showInputDialog("Введите название используемого com-порта");
 
     public static void main(String[] args) throws Exception {
-        CashcodeCcnet cashcode = new CashcodeCcnet(portNameLinux);
+        CashcodeCcnet cashcode = new CashcodeCcnet(portName);
         cashcode.startAccept();
     }
 }
