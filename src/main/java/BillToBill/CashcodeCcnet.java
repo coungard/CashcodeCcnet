@@ -10,17 +10,18 @@ public class CashcodeCcnet extends ErrorsHandler {
 
     private static final int POLYNOMIAL = 0x08408;  // полином для считывания CRC16
     private static final int POLL_TIMEOUT = 200;    // Тайм-аут ожидания ответа от считывателя
-    private static final int EVENT_WAIT_HANDLER_TIMEOUT = 10000;
+    private static final int PAUSE = 1000;
 
     private volatile boolean isLoop = false;
     private static boolean returnBill = false; // эта булевая переменная нужна для дальнейшей обработки
     private static boolean isPowerUp = false;
-    private boolean isEnableBills =false;
+    private boolean isEnableBills = false;
 
-    private SerialPort serialPort;
+    public static SerialPort serialPort;
 
     public CashcodeCcnet(String portName) {
         serialPort = new SerialPort(portName);
+        new ErrorsHandler();
     }
 
 
@@ -34,45 +35,49 @@ public class CashcodeCcnet extends ErrorsHandler {
         serialPort.addEventListener(new PortReader(), SerialPort.MASK_RXCHAR);
 
         powerUpBillValidator();
+        enableBillValidator();
+
         startPollingLoop();
     }
 
+    private void sendPacket(int[] packet) throws SerialPortException, InterruptedException {
+        serialPort.writeIntArray(packet);
+        Thread.sleep(PAUSE);
+    }
+
     private int powerUpBillValidator() throws SerialPortException, InterruptedException {
+        System.out.println("начало Power Up");
         // POWER UP
         lastError = 100000;
         sendPoll();
-
-        // Проверим результат
+        getPollingStatus(receivedData[3]);
+        //Если не получили от купюроприемника сигнала ACK
         if (checkError(receivedData)) {
-            sendNak();
+            lastError = 100050;
             throw new RuntimeException(errorsList.get(lastError));
         }
+        sendAck(); // Иначе отправляем сигнал подтверждения
 
-        // Иначе отправляем сигнал подтверждения
-        sendAck();
-        // RESET
+        System.out.println("команда RESET");
         sendReset();
 
-        //Если не получили от купюроприемника сигнала ACK
-        if (receivedData[3] != 0x00) {
+        // Проверим результат
+        if (receivedData[3] != 0) {
             lastError = 100050;
-            return lastError;
+            throw new RuntimeException(errorsList.get(lastError));
         }
 
         // INITIALIZE
-        // Далее снова опрашиваем купюроприемник
-        sendPoll();
+        sendPoll(); // Далее снова опрашиваем купюроприемник
+        getPollingStatus(receivedData[3]);
 
         if (checkError(receivedData)) {
             sendNak();
             throw new RuntimeException(errorsList.get(lastError));
         }
+        sendAck(); // Иначе отправляем сигнал подтверждения
 
-        // Иначе отправляем сигнал подтверждения
-        sendAck();
-
-        // GET STATUS
-        sendStatus();
+        sendStatus(); // GET STATUS
 
         // Команда GET STATUS возвращает 6 байт ответа. Если все равны 0, то статус ok и можно работать дальше, иначе ошибка
         if (receivedData[3] != 0x00 || receivedData[4] != 0x00 || receivedData[5] != 0x00 ||
@@ -80,6 +85,7 @@ public class CashcodeCcnet extends ErrorsHandler {
             lastError = 100070; //Cтекер снят
             throw new RuntimeException(errorsList.get(lastError));
         }
+        System.out.println("команда Get Status прошла успешно");
 
         sendAck();
 
@@ -92,33 +98,30 @@ public class CashcodeCcnet extends ErrorsHandler {
             return lastError;
         }
 
-        // IDENTIFICATION
-        sendIdentification();
+        sendIdentification(); // IDENTIFICATION
         sendAck();
 
-        // POLL
-        // Далее снова опрашиваем купюроприемник. Должны получить команду INITIALIZE
+        // POLL Далее снова опрашиваем купюроприемник. Должны получить команду INITIALIZE
         sendPoll();
+        getPollingStatus(receivedData[3]);
 
         // Проверим результат
         if (checkError(receivedData)) {
             sendNak();
             throw new RuntimeException(errorsList.get(lastError));
         }
-
         // Иначе отправляем сигнал подтверждения
         sendAck();
 
-        // POLL
-        // Далее снова опрашиваем купюроприемник. Должны получить команду UNIT DISABLE
+        // POLL Далее снова опрашиваем купюроприемник. Должны получить команду UNIT DISABLE
         sendPoll();
+        getPollingStatus(receivedData[3]);
 
         // Проверим результат
         if (checkError(receivedData)) {
             sendNak();
             throw new RuntimeException(errorsList.get(lastError));
         }
-
         // Иначе отправляем сигнал подтверждения
         sendAck();
 
@@ -131,6 +134,7 @@ public class CashcodeCcnet extends ErrorsHandler {
         while (isLoop) {
             // отпавить команду POLL
             sendPoll();
+            getPollingStatus(receivedData[3]);
             // Если четвертый бит не Idling (незанятый), то идем дальше
             if (receivedData[3] != 0x14) {
                 // ACCEPTING
@@ -152,8 +156,16 @@ public class CashcodeCcnet extends ErrorsHandler {
                 // ESCROW POSITION
                 // купюра распознана
                 else if (receivedData[3] == 0x80) {
+                    System.out.println("Данные о купюре в ESCROW : " + Arrays.toString(receivedData));
                     // Подтветждаем
                     sendAck();
+//                    if (receivedData[4] == 0x02){
+//                        System.out.println("Возвращаем купюру номинала 10 RUB");
+//                        sendReturn();
+//                    } else if (receivedData[4] == 0x03) {
+//                        System.out.println("Возвращаем купюру номинала 50 RUB");
+//                        sendReturn();
+//                    }
 
                     //TODO... Событие, что купюра в процессе отправки в стек
 
@@ -213,16 +225,16 @@ public class CashcodeCcnet extends ErrorsHandler {
             }
         }
     }
-
     // Включение режима приема купюр
-    public int EnableBillValidator() throws SerialPortException, InterruptedException {
+
+    public int enableBillValidator() throws SerialPortException, InterruptedException {
 
         isEnableBills = true;
 
         // отправить команду ENABLE BILL TYPES (в тестовом примере отправляет 6 байт  (255 255 255 0 0 0)
         sendEnableBillTypes();
         //функция удержания ? я не до конца понимаю что это
-        sendEnableBillTypesEscrow();
+//        sendEnableBillTypesEscrow();
         //Если не получили от купюроприемника сигнала ACK
         if (receivedData[3] != 0x00) {
             lastError = 100050;
@@ -236,34 +248,32 @@ public class CashcodeCcnet extends ErrorsHandler {
             sendNak();
             throw new RuntimeException(errorsList.get(lastError));
         }
-
         // Иначе отправляем сигнал подтверждения
         sendAck();
+        // выключаем обработку некоторых купюр
 
         return lastError;
     }
-
 
     private class PortReader implements SerialPortEventListener {
         public void serialEvent(SerialPortEvent event) {
 
             if (event.isRXCHAR() && event.getEventValue() > 0) {
-
                 try {
+                    Thread.sleep(POLL_TIMEOUT);
                     receivedData = serialPort.readIntArray();
 
                     if (receivedData.length == 0 || !checkCrc(receivedData)) {
                         throw new RuntimeException("Несоответствие контрольной суммы полученного сообщения. " +
                                 "Возможно устройство не подключено к COM-порту. Проверьте настройки подключения.");
                     }
-                } catch (SerialPortException e) {
+                    // логируем исходящие данные
+                    System.out.println("Исходящие данные от com-port : " + Arrays.toString(receivedData));
+                } catch (SerialPortException | InterruptedException e) {
                     e.printStackTrace();
                 }
-                // логируем исходящие данные
-                System.out.println("Исходящие данные от com-port : " + Arrays.toString(receivedData));
             }
         }
-
     }
 
     public boolean stop() throws SerialPortException {
@@ -311,17 +321,12 @@ public class CashcodeCcnet extends ErrorsHandler {
         sendPacket(formPacket(0x34, new int[]{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}));
     }
 
-    private void sendReturn() throws SerialPortException, InterruptedException {
+        private void sendReturn() throws SerialPortException, InterruptedException {
         sendPacket(formPacket(0x36, new int[]{}));
     }
 
     private void sendPoll() throws SerialPortException, InterruptedException {
         sendPacket(formPacket((byte) 0x33, new int[]{}));
-    }
-
-    private void sendPacket(int[] packet) throws SerialPortException, InterruptedException {
-        serialPort.writeIntArray(packet);
-        Thread.sleep(100);
     }
 
     private int[] formPacket(int command, int[] data) {
@@ -369,7 +374,7 @@ public class CashcodeCcnet extends ErrorsHandler {
         boolean result = true;
         int length = buffer.length;
 
-        int[] oldCRC = new int[]{length - 2, length - 1};
+        int[] oldCRC = new int[]{buffer[length - 2], buffer[length - 1]};
 
         int newCRC16 = getCrc16(Arrays.copyOfRange(buffer, 0, length - 2));
         int[] newCRC = new int[]{newCRC16 & 0xFF, (newCRC16 >> 8) & 0xFF};
@@ -380,6 +385,19 @@ public class CashcodeCcnet extends ErrorsHandler {
                 break;
             }
         }
+        return result;
+    }
+
+    private int cashCodeTable(byte code) {
+        int result = 0;
+
+        if (code == 0x02)       result = 10;           // 10 р.
+        else if (code == 0x03)  result = 50;           // 50 р.
+        else if (code == 0x04)  result = 100;          // 100 р.
+        else if (code == 0x05)  result = 500;          // 500 р.
+        else if (code == 0x06)  result = 1000;         // 1000 р.
+        else if (code == 0x07)  result = 5000;         // 5000 р.
+
         return result;
     }
 

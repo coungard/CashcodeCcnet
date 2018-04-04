@@ -5,12 +5,12 @@ import java.util.HashMap;
 public class ErrorsHandler {
     public HashMap<Integer, String> errorsList;
     public static int lastError;
+    public HashMap<Integer, String> pollingRequest;
 
     public ErrorsHandler() {
         errorsList = new HashMap<>();
 
         errorsList.put(100000, "Неизвестная ошибка");
-
         errorsList.put(100010, "Ошибка открытия Com-порта");
         errorsList.put(100020, "Com-порт не открыт");
         errorsList.put(100030, "Ошибка отпраки команды включения купюроприемника.");
@@ -23,7 +23,6 @@ public class ErrorsHandler {
         errorsList.put(100100, "Ошибка проверки статуса купюроприемника. В стекере застряла купюра.");
         errorsList.put(100110, "Ошибка проверки статуса купюроприемника. Фальшивая купюра.");
         errorsList.put(100120, "Ошибка проверки статуса купюроприемника. Предыдущая купюра еще не попала в стек и находится в механизме распознавания.");
-
         errorsList.put(100130, "Ошибка работы купюроприемника. Сбой при работе механизма стекера.");
         errorsList.put(100140, "Ошибка работы купюроприемника. Сбой в скорости передачи купюры в стекер.");
         errorsList.put(100150, "Ошибка работы купюроприемника. Сбой передачи купюры в стекер.");
@@ -46,6 +45,24 @@ public class ErrorsHandler {
         errorsList.put(0x69, "Rejecting due to Capacity");
         errorsList.put(0x6A, "Rejecting due to Operation");
         errorsList.put(0x6C, "Rejecting due to Length");
+
+        pollingRequest = new HashMap<>();
+        pollingRequest.put(0x10, "Купюроприемник только включили");
+        pollingRequest.put(0x11, "Power Up with Bill in Validator");
+        pollingRequest.put(0x12, "Power Up with Bill in Stacker");
+        pollingRequest.put(0x13, "Купюроприемник выполняет инициализацию после команды RESET от контроллера");
+        pollingRequest.put(0x14, "Купюроприемник ждет вставки банкноты");
+        pollingRequest.put(0x15, "Купюроприемник выполняет сканирование купюры и определение ее номинала");
+        pollingRequest.put(0x18, "Купюроприемник отправляет купюру из позиции ESCROW обратно клиенту и остается в этом состоянии до тех пор, пока клиент не вытащит купюру");
+        pollingRequest.put(0x19, "Купюроприемник был отключен контроллером или просто вышел из инициализации");
+        pollingRequest.put(0x1A, "Cостояние, в котором купюра удерживается в ESCROW, после команды HOLD от контроллера");
+    }
+
+    public void getPollingStatus(int code) {
+        String result = pollingRequest.get(code);
+        if (result.length() > 0) {
+            System.out.println("Status :    " + result);
+        }
     }
 
     public boolean checkError(int[] resultData) {

@@ -32,7 +32,7 @@
                     </execution>
                 </executions>
                 <configuration>
-                    <mainClass>BillToBill.Application</mainClass>
+                    <mainClass>BillToBill.Launcher</mainClass>
                 </configuration>
             </plugin>
         </plugins>
