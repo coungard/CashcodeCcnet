@@ -12,8 +12,10 @@ import javafx.util.Duration;
 
 //  Класс представляет собой сегмент, с которым взаимодействует пользователь из главного меню игры
 public class MenuItem extends StackPane {
+    public String portName;
 
     public MenuItem(String name) {
+        portName = name;
         Rectangle rect = new Rectangle(100,30, Color.WHITE);
         rect.setOpacity(0.8);
         Text text = new Text(name);
@@ -35,5 +37,9 @@ public class MenuItem extends StackPane {
             ft.stop();
             rect.setFill(Color.WHITE);
         });
+    }
+
+    public String getPortName() {
+        return portName;
     }
 }

@@ -45,10 +45,10 @@ public class CashcodeCcnet extends ErrorsHandler {
         Thread.sleep(PAUSE);
     }
 
-    private int powerUpBillValidator() throws SerialPortException, InterruptedException {
+    private void powerUpBillValidator() throws SerialPortException, InterruptedException {
         System.out.println("начало Power Up");
-        // POWER UP
         lastError = 100000;
+        // POWER UP
         sendPoll();
         getPollingStatus(receivedData[3]);
         //Если не получили от купюроприемника сигнала ACK
@@ -95,7 +95,7 @@ public class CashcodeCcnet extends ErrorsHandler {
         //Если не получили от купюроприемника сигнала ACK
         if (receivedData[3] != 0x00) {
             lastError = 100050; // нет ACK
-            return lastError;
+            throw new RuntimeException(errorsList.get(lastError));
         }
 
         sendIdentification(); // IDENTIFICATION
@@ -126,7 +126,6 @@ public class CashcodeCcnet extends ErrorsHandler {
         sendAck();
 
         isPowerUp = true;
-        return lastError;
     }
 
     public void startPollingLoop() throws SerialPortException, InterruptedException {
@@ -227,7 +226,7 @@ public class CashcodeCcnet extends ErrorsHandler {
     }
     // Включение режима приема купюр
 
-    public int enableBillValidator() throws SerialPortException, InterruptedException {
+    public void enableBillValidator() throws SerialPortException, InterruptedException {
 
         isEnableBills = true;
 
@@ -250,9 +249,6 @@ public class CashcodeCcnet extends ErrorsHandler {
         }
         // Иначе отправляем сигнал подтверждения
         sendAck();
-        // выключаем обработку некоторых купюр
-
-        return lastError;
     }
 
     private class PortReader implements SerialPortEventListener {
@@ -293,7 +289,7 @@ public class CashcodeCcnet extends ErrorsHandler {
         sendPacket(formPacket(0x00, new int[]{}));
     }
 
-    public void sendStack() throws SerialPortException, InterruptedException {
+    private void sendStack() throws SerialPortException, InterruptedException {
         sendPacket(formPacket(0x35, new int[]{}));
     }
 
@@ -314,7 +310,7 @@ public class CashcodeCcnet extends ErrorsHandler {
     }
 
     private void sendEnableBillTypes() throws SerialPortException, InterruptedException {
-        sendPacket(formPacket(0x34, new int[]{0xFF, 0xFF, 0xFF, 0, 0, 0}));
+        sendPacket(formPacket(0x34, new int[]{0, 0, 0xEF, 0, 0, 0xEF}));
     }
 
     private void sendEnableBillTypesEscrow() throws SerialPortException, InterruptedException {
@@ -400,5 +396,4 @@ public class CashcodeCcnet extends ErrorsHandler {
 
         return result;
     }
-
 }

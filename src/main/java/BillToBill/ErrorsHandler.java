@@ -60,7 +60,7 @@ public class ErrorsHandler {
 
     public void getPollingStatus(int code) {
         String result = pollingRequest.get(code);
-        if (result.length() > 0) {
+        if (result!=null) {
             System.out.println("Status :    " + result);
         }
     }
@@ -132,7 +132,6 @@ public class ErrorsHandler {
             }   // Capacitance Canal Failure
             IsError = true;
         }
-
         return IsError;
     }
 }
