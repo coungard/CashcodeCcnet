@@ -19,7 +19,7 @@ public class MenuItem extends StackPane {
         Rectangle rect = new Rectangle(100,30, Color.WHITE);
         rect.setOpacity(0.8);
         Text text = new Text(name);
-        text.setFont(Font.font("Arial", FontWeight.BOLD,20));
+        text.setFont(Font.font("Arial", FontWeight.BOLD,15));
 
         getChildren().addAll(rect,text);
 
